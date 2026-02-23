@@ -1,10 +1,100 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const nodemailer = require("nodemailer");
+const express = require("express");
+const path = require("path");
+const crypto = require("crypto");
 
 const region = String(process.env.FUNCTIONS_REGION || "us-central1").trim() || "us-central1";
 
 const getEnv = (key, fallback = "") => String(process.env[key] || fallback).trim();
+const localLogLevel = getEnv("LOCAL_LOG_LEVEL", "info").toLowerCase();
+const keepAliveOnFatal = getEnv("LOCAL_KEEP_ALIVE_ON_FATAL", "true").toLowerCase() === "true";
+
+const safeErrorObject = (error) => ({
+  name: error?.name || "Error",
+  message: error?.message || "Unknown error.",
+  code: error?.code || "",
+  stack: error?.stack || "",
+});
+
+const logLocal = (level, message, payload = {}) => {
+  const levelOrder = { debug: 10, info: 20, warn: 30, error: 40 };
+  const minLevel = levelOrder[localLogLevel] || levelOrder.info;
+  const currentLevel = levelOrder[level] || levelOrder.info;
+  if (currentLevel < minLevel) return;
+
+  if (level === "debug") logger.debug(message, payload);
+  else if (level === "warn") logger.warn(message, payload);
+  else if (level === "error") logger.error(message, payload);
+  else logger.info(message, payload);
+};
+
+const truncate = (value, maxLength = 160) => {
+  const text = String(value || "");
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
+};
+
+const summarizeBody = (body) => {
+  if (!body || typeof body !== "object") return {};
+  return {
+    keys: Object.keys(body),
+    amount: body.amount,
+    phone:
+      body["phone number"] || body.phone || body.phone_number || body.phoneNumber || "",
+    email: body.email || "",
+  };
+};
+
+const getRequestPath = (request) => request.originalUrl || request.url || request.path || "";
+
+const ensureRequestId = (request) => {
+  if (request.requestId) return String(request.requestId);
+  const headerRequestId =
+    request.headers?.["x-request-id"] || request.headers?.["x-correlation-id"] || "";
+  const requestId = headerRequestId ? String(headerRequestId) : crypto.randomUUID();
+  request.requestId = requestId;
+  return requestId;
+};
+
+const logHandlerAccess = (handlerName, request) => {
+  const requestId = ensureRequestId(request);
+  logLocal("info", "Handler accessed", {
+    requestId,
+    handler: handlerName,
+    method: request.method,
+    path: getRequestPath(request),
+    body: summarizeBody(getBody(request)),
+  });
+};
+
+const withAsyncGuard = (handlerName, handler) => async (request, response, next) => {
+  try {
+    await handler(request, response, next);
+  } catch (error) {
+    logger.error("Unhandled route runtime error", {
+      requestId: ensureRequestId(request),
+      handler: handlerName,
+      method: request.method,
+      path: getRequestPath(request),
+      body: summarizeBody(getBody(request)),
+      ...safeErrorObject(error),
+    });
+
+    if (typeof next === "function") {
+      next(error);
+      return;
+    }
+
+    if (!response.headersSent) {
+      response.status(500).json({
+        error: "Internal server error.",
+        requestId: ensureRequestId(request),
+      });
+    }
+  }
+};
 
 const requireEnv = (key) => {
   const value = getEnv(key);
@@ -70,6 +160,26 @@ const getDarajaBaseUrl = () => {
   return environment === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
 };
 
+const isCloudRuntime = () => Boolean(process.env.K_SERVICE || process.env.FUNCTION_TARGET);
+
+const getFirebaseCallbackUrl = () => {
+  const projectId = getEnv("GCLOUD_PROJECT") || getEnv("GOOGLE_CLOUD_PROJECT");
+  if (!projectId) return "";
+  return `https://${region}-${projectId}.cloudfunctions.net/callback`;
+};
+
+const getDarajaCallbackUrl = () => {
+  const localCallback = getEnv("MPESA_CALLBACK_URL_LOCAL");
+  const firebaseCallback = getEnv("MPESA_CALLBACK_URL_FIREBASE");
+  const genericCallback = getEnv("MPESA_CALLBACK_URL");
+
+  if (isCloudRuntime()) {
+    return firebaseCallback || genericCallback || getFirebaseCallbackUrl();
+  }
+
+  return localCallback || genericCallback || getFirebaseCallbackUrl();
+};
+
 const getDarajaToken = async () => {
   const consumerKey = requireEnv("MPESA_CONSUMER_KEY");
   const consumerSecret = requireEnv("MPESA_CONSUMER_SECRET");
@@ -98,12 +208,38 @@ const getDarajaToken = async () => {
 };
 
 const getDarajaTransactionType = () => {
-  const shortcodeType = getEnv("MPESA_SHORTCODE_TYPE", "till_number").toLowerCase();
-  return shortcodeType === "paybill" ? "CustomerPayBillOnline" : "CustomerBuyGoodsOnline";
+  const shortcodeType = getEnv("MPESA_SHORTCODE_TYPE", "till_number")
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+
+  if (shortcodeType === "paybill" || shortcodeType === "customerpaybillonline") {
+    return "CustomerPayBillOnline";
+  }
+
+  if (
+    shortcodeType === "tillnumber" ||
+    shortcodeType === "buygoods" ||
+    shortcodeType === "customerbuygoodsonline"
+  ) {
+    return "CustomerBuyGoodsOnline";
+  }
+
+  const error = new Error(
+    "Invalid MPESA_SHORTCODE_TYPE. Use paybill, till_number, CustomerPayBillOnline, or CustomerBuyGoodsOnline.",
+  );
+  error.statusCode = 500;
+  throw error;
 };
 
 const requestStkPush = async ({ phone, amount, accountReference, transactionDesc }) => {
-  const callbackUrl = requireEnv("MPESA_CALLBACK_URL");
+  const callbackUrl = getDarajaCallbackUrl();
+  if (!callbackUrl) {
+    const error = new Error(
+      "MPESA_CALLBACK_URL is not configured. Set MPESA_CALLBACK_URL_LOCAL and/or MPESA_CALLBACK_URL_FIREBASE.",
+    );
+    error.statusCode = 500;
+    throw error;
+  }
   const businessShortCode = getEnv("MPESA_EXPRESS_SHORTCODE") || requireEnv("MPESA_SHORTCODE");
   const passkey = requireEnv("MPESA_PASSKEY");
 
@@ -170,7 +306,68 @@ const getEmailTransport = () => {
 
 const sanitizeHeaderValue = (value) => String(value || "").replace(/[\r\n]+/g, " ").trim();
 
-exports.stkPush = onRequest({ region, cors: true }, async (request, response) => {
+const loadLocalEnvFile = () => {
+  if (require.main !== module) return;
+  if (typeof process.loadEnvFile !== "function") return;
+  if (process.env.K_SERVICE || process.env.FUNCTION_TARGET) return;
+
+  const envPath = path.join(__dirname, ".env");
+  try {
+    process.loadEnvFile(envPath);
+  } catch (error) {
+    logger.debug("Local .env was not loaded", {
+      message: error?.message || "Unknown .env load error.",
+    });
+  }
+};
+
+loadLocalEnvFile();
+
+let hasInstalledProcessHandlers = false;
+
+const installProcessErrorHandlers = () => {
+  if (hasInstalledProcessHandlers) return;
+  hasInstalledProcessHandlers = true;
+
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason || "Unhandled rejection."));
+    logger.error("Unhandled promise rejection", safeErrorObject(error));
+  });
+
+  process.on("uncaughtException", (error) => {
+    logger.error("Uncaught exception", safeErrorObject(error));
+    if (isCloudRuntime() || !keepAliveOnFatal) {
+      process.exitCode = 1;
+      process.exit(1);
+    }
+  });
+
+  process.on("uncaughtExceptionMonitor", (error) => {
+    logger.error("Uncaught exception monitor", safeErrorObject(error));
+  });
+};
+
+installProcessErrorHandlers();
+
+const stkPushHandler = async (request, response) => {
+  logHandlerAccess("stkPush", request);
+
+  if (request.method === "GET") {
+    response.status(200).json({
+      status: "ready",
+      route: "/stkPush",
+      method: "POST",
+      requiredBody: ["phone number|phone_number|phoneNumber|phone", "amount"],
+      callbacks: {
+        active: getDarajaCallbackUrl() || "",
+        local: getEnv("MPESA_CALLBACK_URL_LOCAL"),
+        firebase: getEnv("MPESA_CALLBACK_URL_FIREBASE"),
+      },
+      note: "Submit JSON in POST body to initiate STK push.",
+    });
+    return;
+  }
+
   if (!assertMethod(request, response, "POST")) return;
 
   try {
@@ -182,6 +379,13 @@ exports.stkPush = onRequest({ region, cors: true }, async (request, response) =>
     const transactionDesc = body.transactionDesc;
 
     const result = await requestStkPush({ phone, amount, accountReference, transactionDesc });
+    logLocal("info", "STK push request queued", {
+      requestId: request.requestId || "",
+      phone: truncate(phone, 32),
+      amount,
+      checkoutRequestId: result?.CheckoutRequestID || "",
+      merchantRequestId: result?.MerchantRequestID || "",
+    });
     response.status(200).json({
       status: "queued",
       ...result,
@@ -196,9 +400,11 @@ exports.stkPush = onRequest({ region, cors: true }, async (request, response) =>
       error: error?.message || "Daraja STK push request failed.",
     });
   }
-});
+};
 
-exports.darajaCallback = onRequest({ region, cors: true }, async (request, response) => {
+const darajaCallbackHandler = async (request, response) => {
+  logHandlerAccess("darajaCallback", request);
+
   if (request.method !== "POST") {
     response.status(200).json({ status: "ok" });
     return;
@@ -212,9 +418,22 @@ exports.darajaCallback = onRequest({ region, cors: true }, async (request, respo
     ResultCode: 0,
     ResultDesc: "Accepted",
   });
-});
+};
 
-exports.sendEmail = onRequest({ region, cors: true }, async (request, response) => {
+const sendEmailHandler = async (request, response) => {
+  logHandlerAccess("sendEmail", request);
+
+  if (request.method === "GET") {
+    response.status(200).json({
+      status: "ready",
+      route: "/sendEmail",
+      method: "POST",
+      requiredBody: ["email", "subject", "message"],
+      note: "Submit JSON in POST body to send email.",
+    });
+    return;
+  }
+
   if (!assertMethod(request, response, "POST")) return;
 
   try {
@@ -254,4 +473,148 @@ exports.sendEmail = onRequest({ region, cors: true }, async (request, response) 
       error: error?.message || "Email delivery failed.",
     });
   }
-});
+};
+
+const createLocalApp = () => {
+  const app = express();
+  app.disable("x-powered-by");
+  app.set("trust proxy", true);
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ extended: true }));
+
+  app.use((request, response, next) => {
+    request.requestId = ensureRequestId(request);
+    const startedAt = Date.now();
+
+    logLocal("info", "Incoming request", {
+      requestId: request.requestId,
+      method: request.method,
+      path: getRequestPath(request),
+      ip: request.ip || request.socket?.remoteAddress || "",
+      userAgent: truncate(request.headers["user-agent"] || "", 180),
+      contentType: request.headers["content-type"] || "",
+    });
+
+    response.on("finish", () => {
+      logLocal("info", "Request completed", {
+        requestId: request.requestId,
+        method: request.method,
+        path: getRequestPath(request),
+        status: response.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
+    });
+
+    next();
+  });
+
+  app.use((request, response, next) => {
+    response.set("Access-Control-Allow-Origin", getEnv("LOCAL_CORS_ORIGIN", "*") || "*");
+    response.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    response.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (request.method === "OPTIONS") {
+      response.status(204).send("");
+      return;
+    }
+
+    next();
+  });
+
+  app.get("/health", (request, response) => {
+    response.status(200).json({
+      status: "ok",
+      service: "kuccps-cluster-functions",
+    });
+  });
+
+  app.all("/stkPush", withAsyncGuard("stkPush", stkPushHandler));
+  app.all("/callback", withAsyncGuard("callback", darajaCallbackHandler));
+  app.all("/darajaCallback", withAsyncGuard("darajaCallback", darajaCallbackHandler));
+  app.all("/sendEmail", withAsyncGuard("sendEmail", sendEmailHandler));
+
+  app.use((error, request, response, next) => {
+    logger.error("Unhandled express error", {
+      requestId: request.requestId || "",
+      method: request.method,
+      path: request.originalUrl || request.url,
+      body: summarizeBody(getBody(request)),
+      ...safeErrorObject(error),
+    });
+
+    if (response.headersSent) {
+      next(error);
+      return;
+    }
+
+    const statusCode =
+      Number(error?.statusCode || error?.status || 500) >= 400
+        ? Number(error?.statusCode || error?.status || 500)
+        : 500;
+
+    response.status(statusCode).json({
+      error: error?.message || "Internal server error.",
+      requestId: request.requestId || "",
+    });
+  });
+
+  app.use((request, response) => {
+    response.status(404).json({ error: "Not found." });
+  });
+
+  return app;
+};
+
+const startLocalServer = async ({ app, requestedPort, retries }) =>
+  new Promise((resolve, reject) => {
+    const tryListen = (port, remainingRetries) => {
+      const server = app.listen(port, () => {
+        resolve({ server, port });
+      });
+
+      server.once("error", (error) => {
+        if (error?.code === "EADDRINUSE" && remainingRetries > 0) {
+          logger.warn("Local port is in use, trying next port.", {
+            attemptedPort: port,
+            nextPort: port + 1,
+          });
+          tryListen(port + 1, remainingRetries - 1);
+          return;
+        }
+
+        reject(error);
+      });
+    };
+
+    tryListen(requestedPort, retries);
+  });
+
+exports.stkPush = onRequest({ region, cors: true }, withAsyncGuard("stkPush", stkPushHandler));
+exports.callback = onRequest({ region, cors: true }, withAsyncGuard("callback", darajaCallbackHandler));
+exports.darajaCallback = onRequest({ region, cors: true }, withAsyncGuard("darajaCallback", darajaCallbackHandler));
+exports.sendEmail = onRequest({ region, cors: true }, withAsyncGuard("sendEmail", sendEmailHandler));
+
+if (require.main === module) {
+  const port = Number(getEnv("PORT", "5001")) || 5001;
+  const retries = Number(getEnv("PORT_RETRIES", "20")) || 20;
+  const app = createLocalApp();
+
+  startLocalServer({ app, requestedPort: port, retries })
+    .then(({ port: actualPort }) => {
+      logger.info("Functions local server started", {
+        url: `http://localhost:${actualPort}`,
+        requestedPort: port,
+        endpoints: ["/stkPush", "/callback", "/darajaCallback", "/sendEmail", "/health"],
+        callbackLocal: getEnv("MPESA_CALLBACK_URL_LOCAL") || "",
+        callbackFirebase: getEnv("MPESA_CALLBACK_URL_FIREBASE") || "",
+      });
+    })
+    .catch((error) => {
+      logger.error("Failed to start local functions server", {
+        message: error?.message || "Unknown startup error.",
+        code: error?.code || "UNKNOWN",
+        requestedPort: port,
+      });
+      process.exitCode = 1;
+    });
+}
