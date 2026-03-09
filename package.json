@@ -1,0 +1,11 @@
+{
+  "name": "kuccps-cluster-system",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend-server ci && npm --prefix backend-server run build",
+    "start": "node backend-server/dist/index.js"
+  }
+}
