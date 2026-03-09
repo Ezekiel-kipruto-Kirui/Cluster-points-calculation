@@ -6,6 +6,6 @@
   },
   "scripts": {
     "build": "npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend-server ci && npm --prefix backend-server run build",
-    "start": "node backend-server/dist/index.js"
+    "start": "npm --prefix backend-server run start"
   }
 }

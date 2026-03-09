@@ -5,6 +5,34 @@ import fs from "fs";
 import crypto from "crypto";
 import { computeAllClusters, medicineEligibility } from "./clusterEngine";
 
+const ensureBackendEnvLoaded = () => {
+  const loadEnvFile = (process as any).loadEnvFile as undefined | ((file?: string) => void);
+  if (typeof loadEnvFile !== "function") return;
+
+  const hasMpesaCallbackConfig = Boolean(
+    process.env.MPESA_CALLBACK_URL || process.env.MPESA_CALLBACK_URL_LOCAL || process.env.MPESA_CALLBACK_URL_FIREBASE,
+  );
+  if (hasMpesaCallbackConfig) return;
+
+  const envCandidates = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "backend-server", ".env"),
+    path.resolve(__dirname, "..", ".env"),
+  ];
+
+  for (const envPath of envCandidates) {
+    if (!fs.existsSync(envPath)) continue;
+    try {
+      loadEnvFile(envPath);
+    } catch {
+      // Keep running; explicit env vars can still be provided by host runtime.
+    }
+    break;
+  }
+};
+
+ensureBackendEnvLoaded();
+
 const getEnv = (key: string, fallback = "") => String(process.env[key] || fallback).trim();
 const localLogLevel = getEnv("LOCAL_LOG_LEVEL", "info").toLowerCase();
 const keepAliveOnFatal = getEnv("LOCAL_KEEP_ALIVE_ON_FATAL", "true").toLowerCase() === "true";
@@ -1254,7 +1282,7 @@ const requestStkPush = async ({
   const callbackUrl = getDarajaCallbackUrl();
   if (!callbackUrl) {
     const error: any = new Error(
-      "MPESA_CALLBACK_URL is not configured. Set MPESA_CALLBACK_URL on backend.",
+      "M-Pesa callback URL is not configured. Set MPESA_CALLBACK_URL, MPESA_CALLBACK_URL_LOCAL, or MPESA_CALLBACK_URL_FIREBASE on backend.",
     );
     error.statusCode = 500;
     throw error;
