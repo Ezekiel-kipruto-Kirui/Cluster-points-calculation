@@ -8,8 +8,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "serve": "npm run build:backend-server && node ../backend-server/dist/index.js",
-    "build:backend-server": "npm --prefix ../backend-server install && npm --prefix ../backend-server run build",
+    "serve": "npm run build:backend && node ../dist/index.js",
+    "build:backend": "npm --prefix .. install && npm --prefix .. run build:backend",
     "start": "npm run build && npm run serve"
   },
   "dependencies": {

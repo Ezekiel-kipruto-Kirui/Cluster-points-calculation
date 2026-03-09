@@ -2333,9 +2333,11 @@ const createBackendServer = () => {
 
   // Serve React build (Vite) when available.
   const frontendDistCandidates = [
+    path.resolve(__dirname, "..", "frontend", "dist"),
     path.resolve(__dirname, "..", "..", "frontend", "dist"),
-    path.resolve(__dirname, "..", "..", "dist"),
+    path.resolve(process.cwd(), "frontend", "dist"),
     path.resolve(__dirname, "..", "dist"),
+    path.resolve(process.cwd(), "dist"),
   ];
 
   const distPath = frontendDistCandidates.find((candidatePath) =>

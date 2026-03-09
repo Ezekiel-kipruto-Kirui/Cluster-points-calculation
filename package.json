@@ -1,11 +1,25 @@
 {
-  "name": "kuccps-cluster-system",
+  "name": "kuccps-cluster-backend-server",
   "private": true,
+  "main": "index.js",
   "engines": {
     "node": "20"
   },
   "scripts": {
-    "build": "npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend-server ci && npm --prefix backend-server run build",
-    "start": "npm --prefix backend-server run start"
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "tsc -p tsconfig.json",
+    "start": "npm run build:backend && node --env-file=.env dist/index.js",
+    "start:local": "npm run start"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "nodemailer": "^7.0.7"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "@types/nodemailer": "^6.4.23",
+    "typescript": "^5.9.3"
   }
 }

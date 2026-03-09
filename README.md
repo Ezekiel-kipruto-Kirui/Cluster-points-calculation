@@ -2,25 +2,29 @@
 
 Monorepo with:
 - `frontend/`: React + Vite app.
-- `backend-server/`: Express TypeScript API (Daraja, email, Firebase Realtime Database, and static frontend serving).
+- Root backend (`index.ts`, `clusterEngine.ts`): Express TypeScript API (Daraja, email, Firebase Realtime Database, and static frontend serving).
 
-## Quick start
+## Install
 
 ```bash
-npm run bootstrap
-npm run dev
+npm install
+npm --prefix frontend install
 ```
 
-## Build frontend
+## Build
 
 ```bash
 npm run build
 ```
 
+This builds:
+- `frontend/dist` (frontend)
+- `dist` (backend TypeScript output)
+
 ## Run backend server
 
 ```bash
-npm run serve
+npm start
 ```
 
 Backend endpoints (default `http://localhost:5001`):
@@ -44,15 +48,14 @@ Backend endpoints (default `http://localhost:5001`):
 - `GET /health`
 
 If `5001` is in use, the server retries subsequent ports (`5002`, `5003`, ...).
-Optional overrides in `backend-server/.env`:
+
+Optional overrides in root `.env`:
 - `PORT=5001`
 - `PORT_RETRIES=20`
 - `MPESA_*` credentials and callback URL
 - `FIREBASE_*` project configuration (`apiKey`, `authDomain`, `databaseURL`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`, `measurementId`)
 - `REALTIME_*` paths
 - `SUPER_ADMIN_EMAIL`
-
-Frontend no longer requires Firebase or Daraja environment variables; those are now centralized in `backend-server/.env`.
 
 ## Access model
 
@@ -63,7 +66,8 @@ Frontend no longer requires Firebase or Daraja environment variables; those are 
 ## Project structure
 
 ```text
-backend-server/
+clusterEngine.ts
+index.ts
 frontend/
   public/
   src/
