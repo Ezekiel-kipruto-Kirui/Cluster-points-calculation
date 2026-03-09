@@ -1,14 +1,13 @@
-# KUCCPS Cluster React
+# KUCCPS Cluster System
 
-React (Vite) frontend with:
-- Local cluster-point calculation engine.
-- Firebase Cloud Functions integration for Daraja payment and email endpoints.
-- Firebase Realtime Database for course catalog and session storage.
+Monorepo with:
+- `frontend/`: React + Vite app.
+- `backend-server/`: Express TypeScript API (Daraja, email, Firebase Realtime Database, and static frontend serving).
 
-## Run frontend
+## Quick start
 
 ```bash
-npm install
+npm run bootstrap
 npm run dev
 ```
 
@@ -18,63 +17,54 @@ npm run dev
 npm run build
 ```
 
-## Run Firebase Functions (Daraja + Email)
+## Run backend server
 
 ```bash
-cd functions
-npm install
-firebase login
-firebase deploy --only functions
+npm run serve
 ```
 
-## Environment setup
+Backend endpoints (default `http://localhost:5001`):
+- `POST /api/payments`
+- `POST /api/payments/query`
+- `POST /api/payments/callback`
+- `GET /api/payments/validation`
+- `GET /api/catalog`
+- `POST /api/sessions`
+- `GET /api/sessions/:code`
+- `POST /api/admin/login`
+- `GET /api/admin/me`
+- `POST /api/admin/logout`
+- `GET /api/admin/health`
+- `POST /stkPush`
+- `GET|POST /paymentStatus`
+- `POST /calculateClusterPoints`
+- `POST /sendEmail`
+- `POST /callback`
+- `POST /darajaCallback`
+- `GET /health`
 
-1. Copy `.env.example` to `.env`.
-2. Set backend endpoint variables (Firebase Functions first, Django optional fallback):
-   - `VITE_FIREBASE_FUNCTIONS_BASE_URL` (example: `https://us-central1-<project-id>.cloudfunctions.net`)
-   - Optional fallback: `VITE_DJANGO_API_BASE_URL`, `VITE_DJANGO_DARAJA_URL`, `VITE_DJANGO_EMAIL_URL`
-3. Set Firebase Realtime Database config:
-   - `VITE_FIREBASE_API_KEY`
-   - `VITE_FIREBASE_AUTH_DOMAIN`
-   - `VITE_FIREBASE_DATABASE_URL`
-   - `VITE_FIREBASE_PROJECT_ID`
-   - `VITE_FIREBASE_STORAGE_BUCKET`
-   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
-   - `VITE_FIREBASE_APP_ID`
-   - `VITE_REALTIME_COURSES_PATH` (default `courses`)
-4. Set admin/auth settings:
-   - `VITE_REALTIME_ADMINS_PATH` (default `admins`)
-   - `VITE_SUPER_ADMIN_EMAIL` (first super admin bootstrap email)
-5. Set Cloud Functions secrets in `functions/.env`:
-   - `MPESA_*` variables for Daraja STK push
-   - `EMAIL_HOST_*` and `EMAIL_FROM` for email delivery
-5. In Firebase Console:
-   - Enable Authentication `Email/Password` provider.
-   - Ensure Realtime Database rules allow authenticated admins to read/write `admins`, `courses`, and required session paths.
+If `5001` is in use, the server retries subsequent ports (`5002`, `5003`, ...).
+Optional overrides in `backend-server/.env`:
+- `PORT=5001`
+- `PORT_RETRIES=20`
+- `MPESA_*` credentials and callback URL
+- `FIREBASE_*` project configuration (`apiKey`, `authDomain`, `databaseURL`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`, `measurementId`)
+- `REALTIME_*` paths
+- `SUPER_ADMIN_EMAIL`
+
+Frontend no longer requires Firebase or Daraja environment variables; those are now centralized in `backend-server/.env`.
+
+## Access model
+
+- Public users (calculator, payment flow, results/course checks) do not require authentication.
+- Admin authentication is only required for `/admin` UI routes and `/api/admin/*` backend routes.
+- Public course browsing uses bundled `courses.csv`; admin mode reads/writes the backend Firebase catalog.
 
 ## Project structure
 
 ```text
-public/
-src/
-  components/
-    admin/
-    common/
-    layout/
-    results/
-  config/
-  hooks/
-  lib/
-  pages/
-  utils/
+backend-server/
+frontend/
+  public/
+  src/
 ```
-
-## Notes
-
-- App has been refactored for separation of concerns:
-  - pages handle screen-level behavior
-  - components handle reusable UI
-  - hooks hold reusable stateful logic
-  - utils/config keep pure helpers and constants
-- Course options are loaded from Firebase Realtime Database.
-- Admin login now uses Firebase Authentication (Email/Password).
