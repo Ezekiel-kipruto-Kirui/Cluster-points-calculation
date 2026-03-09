@@ -2382,14 +2382,16 @@ const startLocalServer = async ({
   app,
   requestedPort,
   retries,
+  host,
 }: {
   app: express.Express;
   requestedPort: number;
   retries: number;
+  host: string;
 }) =>
   new Promise<{ server: any; port: number }>((resolve, reject) => {
     const tryListen = (port: number, remainingRetries: number) => {
-      const server = app.listen(port, () => {
+      const server = app.listen(port, host, () => {
         resolve({ server, port });
       });
 
@@ -2412,13 +2414,16 @@ const startLocalServer = async ({
 
 if (require.main === module) {
   const port = Number(getEnv("PORT", "5001")) || 5001;
+  const host = getEnv("HOST", "0.0.0.0") || "0.0.0.0";
   const retries = Number(getEnv("PORT_RETRIES", "20")) || 20;
   const app = createBackendServer();
 
-  startLocalServer({ app, requestedPort: port, retries })
+  startLocalServer({ app, requestedPort: port, retries, host })
     .then(({ port: actualPort }) => {
       logger.info("Backend server started", {
-        url: `http://localhost:${actualPort}`,
+        url: `http://${host}:${actualPort}`,
+        railwayPort: getEnv("PORT", ""),
+        railwayHost: getEnv("HOST", ""),
         requestedPort: port,
         endpoints: [
           "/stkPush",
