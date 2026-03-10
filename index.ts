@@ -54,7 +54,7 @@ const parseNumberEnv = (value: string, fallback: number) => {
 const sessionsPath = firstEnv("REALTIME_SESSIONS_PATH", "VITE_REALTIME_SESSIONS_PATH") || "clusterSessions";
 const courseCatalogPath = firstEnv("REALTIME_COURSES_PATH", "VITE_REALTIME_COURSES_PATH") || "courses";
 const adminsPath = firstEnv("REALTIME_ADMINS_PATH", "VITE_REALTIME_ADMINS_PATH") || "admins";
-const payableAmount = Number(getEnv("PAYABLE_AMOUNT", "1")) || 1;
+const payableAmount = parseNumberEnv(getEnv("PAYABLE_AMOUNT"), 0);
 const superAdminEmail = firstEnv("SUPER_ADMIN_EMAIL", "VITE_SUPER_ADMIN_EMAIL").toLowerCase();
 const normalizeOrigin = (value: string) => String(value || "").trim().replace(/\/+$/, "");
 const rawCorsOrigins = (firstEnv("CORS_ORIGIN", "LOCAL_CORS_ORIGIN", "FRONTEND_ORIGIN") || "*").trim() || "*";
