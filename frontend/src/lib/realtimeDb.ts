@@ -1,13 +1,15 @@
+import { buildApiUrl } from "./apiBase";
+
 const localSessionsStorageKey = "kuccps.cluster.sessions";
 
 const apiRoutes = {
-  catalog: "/api/catalog",
-  adminCatalogUpload: "/api/admin/catalog/upload",
-  adminCatalogCourse: "/api/admin/catalog/course",
-  sessions: "/api/sessions",
-  adminSessions: "/api/admin/sessions",
-  adminSessionsBulkDelete: "/api/admin/sessions/delete-many",
-  adminMe: "/api/admin/me",
+  catalog: buildApiUrl("/api/catalog"),
+  adminCatalogUpload: buildApiUrl("/api/admin/catalog/upload"),
+  adminCatalogCourse: buildApiUrl("/api/admin/catalog/course"),
+  sessions: buildApiUrl("/api/sessions"),
+  adminSessions: buildApiUrl("/api/admin/sessions"),
+  adminSessionsBulkDelete: buildApiUrl("/api/admin/sessions/delete-many"),
+  adminMe: buildApiUrl("/api/admin/me"),
 };
 
 type HttpResult<T = any> = {

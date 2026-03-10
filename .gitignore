@@ -32,6 +32,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 dist/
+!dist/
+!dist/**
 !frontend/dist/
 !frontend/dist/**
 

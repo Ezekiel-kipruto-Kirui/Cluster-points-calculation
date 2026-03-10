@@ -34,7 +34,8 @@ const ensureBackendEnvLoaded = () => {
 ensureBackendEnvLoaded();
 
 const getEnv = (key: string, fallback = "") => String(process.env[key] || fallback).trim();
-const localLogLevel = getEnv("LOCAL_LOG_LEVEL", "info").toLowerCase();
+const isProduction = getEnv("NODE_ENV", "").toLowerCase() === "production";
+const localLogLevel = getEnv("LOCAL_LOG_LEVEL", isProduction ? "warn" : "info").toLowerCase();
 const keepAliveOnFatal = getEnv("LOCAL_KEEP_ALIVE_ON_FATAL", "true").toLowerCase() === "true";
 
 const firstEnv = (...keys: string[]): string => {
@@ -45,11 +46,17 @@ const firstEnv = (...keys: string[]): string => {
   return "";
 };
 
+const parseNumberEnv = (value: string, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const sessionsPath = firstEnv("REALTIME_SESSIONS_PATH", "VITE_REALTIME_SESSIONS_PATH") || "clusterSessions";
 const courseCatalogPath = firstEnv("REALTIME_COURSES_PATH", "VITE_REALTIME_COURSES_PATH") || "courses";
 const adminsPath = firstEnv("REALTIME_ADMINS_PATH", "VITE_REALTIME_ADMINS_PATH") || "admins";
 const payableAmount = Number(firstEnv("PAYABLE_AMOUNT", "VITE_PAYABLE_AMOUNT") || "1") || 1;
 const superAdminEmail = firstEnv("SUPER_ADMIN_EMAIL", "VITE_SUPER_ADMIN_EMAIL").toLowerCase();
+const corsOrigin = (firstEnv("CORS_ORIGIN", "LOCAL_CORS_ORIGIN", "FRONTEND_ORIGIN") || "*").trim() || "*";
 
 const adminSessionCookieName = getEnv("ADMIN_SESSION_COOKIE_NAME", "admin_session");
 const adminSessionTtlMs = Number(getEnv("ADMIN_SESSION_TTL_MS", `${24 * 60 * 60 * 1000}`)) || 24 * 60 * 60 * 1000;
@@ -1087,6 +1094,7 @@ const savePaymentSession = (session: PaymentSession | null) => {
 };
 
 const upsertPaymentSession = (patch: Partial<PaymentSession>): PaymentSession | null => {
+  cleanupExpiredPaymentSessions();
   const normalizedCheckoutRequestId = normalizeRequestIdentifier(patch?.checkoutRequestId);
   const normalizedMerchantRequestId = normalizeRequestIdentifier(patch?.merchantRequestId);
   const resolvedCheckoutRequestId =
@@ -1162,23 +1170,87 @@ const normalizeGradesPayload = (value: any) => {
   }, {});
 };
 
-// In-memory cache for cluster calculation results
-const clusterResultsCache = new Map<string, { source: string; results: Record<number, number>; medicineEligible: boolean }>();
+type ClusterResultPayload = {
+  source: string;
+  results: Record<number, number>;
+  medicineEligible: boolean;
+};
+
+type ClusterCacheEntry = {
+  expiresAt: number;
+  value: ClusterResultPayload;
+};
+
+const clusterCacheMaxEntries = Math.max(
+  0,
+  parseNumberEnv(getEnv("CLUSTER_CACHE_MAX", "200"), 200),
+);
+const clusterCacheTtlMs = Math.max(
+  0,
+  parseNumberEnv(getEnv("CLUSTER_CACHE_TTL_MS", `${10 * 60 * 1000}`), 10 * 60 * 1000),
+);
+const clusterCacheEnabled = clusterCacheMaxEntries > 0 && clusterCacheTtlMs > 0;
+
+// In-memory cache for cluster calculation results (bounded + TTL)
+const clusterResultsCache = new Map<string, ClusterCacheEntry>();
+
+const pruneClusterResultsCache = () => {
+  if (!clusterCacheEnabled) return;
+  const now = Date.now();
+  for (const [key, entry] of clusterResultsCache.entries()) {
+    if (!entry || entry.expiresAt <= now) {
+      clusterResultsCache.delete(key);
+    }
+  }
+  while (clusterResultsCache.size > clusterCacheMaxEntries) {
+    const oldestKey = clusterResultsCache.keys().next().value;
+    if (!oldestKey) break;
+    clusterResultsCache.delete(oldestKey);
+  }
+};
+
+const getClusterCache = (cacheKey: string): ClusterResultPayload | null => {
+  if (!clusterCacheEnabled) return null;
+  const entry = clusterResultsCache.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    clusterResultsCache.delete(cacheKey);
+    return null;
+  }
+  // Refresh LRU order
+  clusterResultsCache.delete(cacheKey);
+  clusterResultsCache.set(cacheKey, entry);
+  return entry.value;
+};
+
+const setClusterCache = (cacheKey: string, value: ClusterResultPayload) => {
+  if (!clusterCacheEnabled) return;
+  clusterResultsCache.set(cacheKey, { value, expiresAt: Date.now() + clusterCacheTtlMs });
+  pruneClusterResultsCache();
+};
 
 const calculateClusterResults = async (grades: any) => {
   const normalizedGrades = normalizeGradesPayload(grades);
-  const cacheKey = JSON.stringify(normalizedGrades);
-  const cached = clusterResultsCache.get(cacheKey);
-  if (cached) return cached;
 
-  const value = {
+  if (clusterCacheEnabled) {
+    const cacheKey = JSON.stringify(normalizedGrades);
+    const cached = getClusterCache(cacheKey);
+    if (cached) return cached;
+
+    const value: ClusterResultPayload = {
+      source: "express-server",
+      results: computeAllClusters(normalizedGrades),
+      medicineEligible: medicineEligibility(normalizedGrades),
+    };
+    setClusterCache(cacheKey, value);
+    return value;
+  }
+
+  return {
     source: "express-server",
     results: computeAllClusters(normalizedGrades),
     medicineEligible: medicineEligibility(normalizedGrades),
   };
-
-  clusterResultsCache.set(cacheKey, value);
-  return value;
 };
 
 type FirebasePublicConfig = {
@@ -2230,7 +2302,6 @@ const createBackendServer = () => {
   });
 
   app.use((request, response, next) => {
-    const corsOrigin = getEnv("LOCAL_CORS_ORIGIN", "*") || "*";
     const requestOrigin = String(request.headers.origin || "").trim();
     const allowOrigin = corsOrigin === "*" ? requestOrigin || "*" : corsOrigin;
     response.set("Access-Control-Allow-Origin", allowOrigin);

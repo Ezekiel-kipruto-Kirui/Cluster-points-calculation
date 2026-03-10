@@ -6,10 +6,10 @@
     "node": "20"
   },
   "scripts": {
-    "build": "npm run build:frontend && npm run build:backend",
+    "build": "node scripts/build.js",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "tsc -p tsconfig.json",
-    "start": "npm run build:backend && node --env-file=.env dist/index.js",
+    "start": "node --env-file=.env dist/index.js",
     "start:local": "npm run start"
   },
   "dependencies": {

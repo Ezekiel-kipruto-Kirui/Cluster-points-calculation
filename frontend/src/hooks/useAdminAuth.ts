@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { buildApiUrl } from "../lib/apiBase";
 import type { AdminProfile } from "../lib/realtimeDb";
 
 type AdminUser = {
@@ -42,7 +43,7 @@ export const useAdminAuth = ({ enabled = true }: UseAdminAuthOptions = {}) => {
   const loadCurrentAdmin = useCallback(async () => {
     setAuthLoading(true);
     try {
-      const response = await fetch("/api/admin/me", {
+      const response = await fetch(buildApiUrl("/api/admin/me"), {
         method: "GET",
         credentials: "include",
       });
@@ -76,7 +77,7 @@ export const useAdminAuth = ({ enabled = true }: UseAdminAuthOptions = {}) => {
     setAuthWorking(true);
     setAuthError("");
     try {
-      const response = await fetch("/api/admin/login", {
+      const response = await fetch(buildApiUrl("/api/admin/login"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -114,7 +115,7 @@ export const useAdminAuth = ({ enabled = true }: UseAdminAuthOptions = {}) => {
   const logout = useCallback(async () => {
     setAuthWorking(true);
     try {
-      await fetch("/api/admin/logout", {
+      await fetch(buildApiUrl("/api/admin/logout"), {
         method: "POST",
         credentials: "include",
       });
@@ -135,7 +136,7 @@ export const useAdminAuth = ({ enabled = true }: UseAdminAuthOptions = {}) => {
         throw new Error("Only a super admin can add regular admin users.");
       }
 
-      const response = await fetch("/api/admin/regular-admin", {
+      const response = await fetch(buildApiUrl("/api/admin/regular-admin"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

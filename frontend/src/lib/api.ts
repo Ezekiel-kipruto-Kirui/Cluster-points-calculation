@@ -1,11 +1,12 @@
+import { buildApiUrl } from "./apiBase";
 import { computeAllClusters, medicineEligibility } from "./clusterEngine";
 
 const endpoints = {
-  darajaPayment: "/api/payments",
-  darajaQuery: "/api/payments/query",
-  email: "/sendEmail",
-  calculateCluster: "/calculateClusterPoints",
-  adminHealth: "/api/admin/health",
+  darajaPayment: buildApiUrl("/api/payments"),
+  darajaQuery: buildApiUrl("/api/payments/query"),
+  email: buildApiUrl("/sendEmail"),
+  calculateCluster: buildApiUrl("/calculateClusterPoints"),
+  adminHealth: buildApiUrl("/api/admin/health"),
 };
 
 type HttpResult<T = any> = {

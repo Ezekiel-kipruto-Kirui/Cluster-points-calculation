@@ -21,6 +21,8 @@ This builds:
 - `frontend/dist` (frontend)
 - `dist` (backend TypeScript output)
 
+If your hosting plan cannot build (for example, a low-resource Truehost plan), run the build locally and deploy the generated `dist/` and `frontend/dist/` folders. You can set `SKIP_BUILD=true` on the host to skip automatic build steps if the platform runs `npm run build` by default.
+
 ## Run backend server
 
 ```bash
@@ -56,6 +58,10 @@ Optional overrides in root `.env`:
 - `FIREBASE_*` project configuration (`apiKey`, `authDomain`, `databaseURL`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`, `measurementId`)
 - `REALTIME_*` paths
 - `SUPER_ADMIN_EMAIL`
+
+Production notes:
+- Set `CORS_ORIGIN=https://clusterpointscalculation.co.ke` if your frontend is served from that domain and you need cross-origin API calls.
+- `VITE_API_BASE_URL` (frontend build-time, optional): set to your API origin (example `https://clusterpointscalculation.co.ke`) when the frontend and backend are hosted on different origins. Leave empty when the backend serves the frontend at the same origin.
 
 ## Access model
 
