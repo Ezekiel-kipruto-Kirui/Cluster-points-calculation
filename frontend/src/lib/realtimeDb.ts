@@ -291,18 +291,18 @@ export const saveClusterSession = async ({
     throw new Error(extractErrorMessage(result, "Unable to save session to backend."));
   }
 
-  const payload: any = result.data || {};
+  const responsePayload: any = result.data || {};
   return {
-    code: normalizeSessionCode(payload.code),
-    email: String(payload.email || "").trim(),
-    phoneNumber: String(payload.phoneNumber || "").trim(),
-    amountPaid: Number(payload.amountPaid ?? 0),
-    grades: normalizeSessionGrades(payload.grades),
-    results: normalizeSessionResults(payload.results),
-    medicineEligible: Boolean(payload.medicineEligible),
-    paymentResponse: payload.paymentResponse || null,
-    createdAt: String(payload.createdAt || ""),
-    updatedAt: String(payload.updatedAt || ""),
+    code: normalizeSessionCode(responsePayload.code),
+    email: String(responsePayload.email || "").trim(),
+    phoneNumber: String(responsePayload.phoneNumber || "").trim(),
+    amountPaid: Number(responsePayload.amountPaid ?? 0),
+    grades: normalizeSessionGrades(responsePayload.grades),
+    results: normalizeSessionResults(responsePayload.results),
+    medicineEligible: Boolean(responsePayload.medicineEligible),
+    paymentResponse: responsePayload.paymentResponse || null,
+    createdAt: String(responsePayload.createdAt || ""),
+    updatedAt: String(responsePayload.updatedAt || ""),
     storage: "firebase",
   };
 };
