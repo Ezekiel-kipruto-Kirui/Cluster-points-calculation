@@ -56,7 +56,13 @@ const courseCatalogPath = firstEnv("REALTIME_COURSES_PATH", "VITE_REALTIME_COURS
 const adminsPath = firstEnv("REALTIME_ADMINS_PATH", "VITE_REALTIME_ADMINS_PATH") || "admins";
 const payableAmount = Number(firstEnv("PAYABLE_AMOUNT", "VITE_PAYABLE_AMOUNT") || "1") || 1;
 const superAdminEmail = firstEnv("SUPER_ADMIN_EMAIL", "VITE_SUPER_ADMIN_EMAIL").toLowerCase();
-const corsOrigin = (firstEnv("CORS_ORIGIN", "LOCAL_CORS_ORIGIN", "FRONTEND_ORIGIN") || "*").trim() || "*";
+const normalizeOrigin = (value: string) => String(value || "").trim().replace(/\/+$/, "");
+const rawCorsOrigins = (firstEnv("CORS_ORIGIN", "LOCAL_CORS_ORIGIN", "FRONTEND_ORIGIN") || "*").trim() || "*";
+const corsOrigins = rawCorsOrigins
+  .split(",")
+  .map((origin) => normalizeOrigin(origin))
+  .filter(Boolean);
+const allowAnyCorsOrigin = corsOrigins.includes("*");
 
 const adminSessionCookieName = getEnv("ADMIN_SESSION_COOKIE_NAME", "admin_session");
 const adminSessionTtlMs = Number(getEnv("ADMIN_SESSION_TTL_MS", `${24 * 60 * 60 * 1000}`)) || 24 * 60 * 60 * 1000;
@@ -2302,9 +2308,20 @@ const createBackendServer = () => {
   });
 
   app.use((request, response, next) => {
-    const requestOrigin = String(request.headers.origin || "").trim();
-    const allowOrigin = corsOrigin === "*" ? requestOrigin || "*" : corsOrigin;
-    response.set("Access-Control-Allow-Origin", allowOrigin);
+    const requestOrigin = normalizeOrigin(request.headers.origin || "");
+    let allowOrigin = "";
+
+    if (allowAnyCorsOrigin) {
+      allowOrigin = requestOrigin || "*";
+    } else if (requestOrigin && corsOrigins.includes(requestOrigin)) {
+      allowOrigin = requestOrigin;
+    } else if (corsOrigins.length > 0) {
+      allowOrigin = corsOrigins[0];
+    }
+
+    if (allowOrigin) {
+      response.set("Access-Control-Allow-Origin", allowOrigin);
+    }
     response.set("Vary", "Origin");
     response.set("Access-Control-Allow-Credentials", "true");
     response.set("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");

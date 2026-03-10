@@ -60,7 +60,9 @@ Optional overrides in root `.env`:
 - `SUPER_ADMIN_EMAIL`
 
 Production notes:
-- Set `CORS_ORIGIN=https://clusterpointscalculation.co.ke` if your frontend is served from that domain and you need cross-origin API calls.
+- Set `CORS_ORIGIN` to a comma-separated list of allowed origins, for example
+  `https://clusterpointscalculation.co.ke,https://cluster-calculation-production.up.railway.app`, if your frontend is
+  served from those domains and you need cross-origin API calls.
 - `VITE_API_BASE_URL` (frontend build-time, optional): set to your API origin (example `https://clusterpointscalculation.co.ke`) when the frontend and backend are hosted on different origins. Leave empty when the backend serves the frontend at the same origin.
 
 ## Access model
