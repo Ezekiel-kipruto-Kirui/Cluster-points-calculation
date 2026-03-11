@@ -12,8 +12,7 @@
   },
   "include": [
     "index.ts",
-    "clusterEngine.ts",
-    "api/[...path].ts"
+    "clusterEngine.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

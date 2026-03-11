@@ -2589,11 +2589,16 @@ const startLocalServer = async ({
     tryListen(requestedPort, retries);
   });
 
+const app = createBackendServer();
+
+// Vercel expects a default export that is a function or server.
+export default app;
+module.exports = app;
+
 if (require.main === module) {
   const port = Number(getEnv("PORT", "5001")) || 5001;
   const host = getEnv("HOST", "0.0.0.0") || "0.0.0.0";
   const retries = Number(getEnv("PORT_RETRIES", "20")) || 20;
-  const app = createBackendServer();
 
   startLocalServer({ app, requestedPort: port, retries, host })
     .then(({ port: actualPort }) => {
