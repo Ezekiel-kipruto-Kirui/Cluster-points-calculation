@@ -2369,11 +2369,21 @@ export const createBackendServer = () => {
   app.get("/admin/health", requireAdminSession, withAsyncGuard("adminHealthLegacy", adminHealthHandler));
   app.get("/api/admin/health", requireAdminSession, withAsyncGuard("adminHealth", adminHealthHandler));
 
+  const healthPayload = () => ({
+    status: "ok",
+    service: "kuccps-cluster-backend-server",
+    trackedPayments: paymentSessionsByCheckoutId.size,
+  });
+
   app.get("/health", (request, response) => {
     response.status(200).json({
-      status: "ok",
-      service: "kuccps-cluster-backend-server",
-      trackedPayments: paymentSessionsByCheckoutId.size,
+      ...healthPayload(),
+    });
+  });
+
+  app.get("/api/health", (request, response) => {
+    response.status(200).json({
+      ...healthPayload(),
     });
   });
 
