@@ -13,7 +13,7 @@
   "include": [
     "index.ts",
     "clusterEngine.ts",
-    "api/index.ts"
+    "api/[...path].ts"
   ],
   "exclude": ["dist", "node_modules"]
 }
