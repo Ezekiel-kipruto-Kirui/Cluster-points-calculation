@@ -77,7 +77,7 @@ const clusterFormula = (r: number, t: number): number =>
   Number((Math.sqrt((r / 48) * (t / 84)) * 48 * 0.94).toFixed(3));
 
 export const medicineEligibility = (gradesByCode: GradeMap): boolean => {
-  const required: SubjectCode[] = ["BIO", "CHE", "MAT", "PHY"];
+  const required: SubjectCode[] = ["BIO", "CHE", "MAT"];
   return required.every((code) => gradesByCode[code] && gradesByCode[code] in GRADE_POINTS);
 };
 
@@ -250,4 +250,3 @@ export const computeAllClusters = (rawGrades: GradeMap): Record<number, number> 
   }
   return results;
 };
-
