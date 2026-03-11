@@ -2305,7 +2305,7 @@ const logHandlerAccess = (handlerName: string, request: express.Request & { requ
   });
 };
 
-const createBackendServer = () => {
+export const createBackendServer = () => {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", true);
@@ -2392,6 +2392,11 @@ const createBackendServer = () => {
         "/calculateClusterPoints",
         "/sendEmail",
         "/api/sendEmail",
+        "/api/paymentStatus",
+        "/api/calculateClusterPoints",
+        "/api/stkPush",
+        "/api/callback",
+        "/api/darajaCallback",
         "/api/catalog",
         "/api/sessions/:code",
         "/api/admin/login",
@@ -2451,6 +2456,11 @@ const createBackendServer = () => {
   app.all("/calculateClusterPoints", withAsyncGuard("calculateClusterPoints", calculateClusterPointsHandler));
   app.all("/sendEmail", withAsyncGuard("sendEmail", sendEmailHandler));
   app.all("/api/sendEmail", withAsyncGuard("sendEmailApi", sendEmailHandler));
+  app.all("/api/paymentStatus", withAsyncGuard("paymentStatusApi", paymentStatusHandler));
+  app.all("/api/calculateClusterPoints", withAsyncGuard("calculateClusterPointsApi", calculateClusterPointsHandler));
+  app.all("/api/stkPush", withAsyncGuard("stkPushApi", stkPushHandler));
+  app.all("/api/callback", withAsyncGuard("callbackApi", darajaCallbackHandler));
+  app.all("/api/darajaCallback", withAsyncGuard("darajaCallbackApi", darajaCallbackHandler));
 
   // Serve React build (Vite) when available.
   const frontendDistCandidates = [

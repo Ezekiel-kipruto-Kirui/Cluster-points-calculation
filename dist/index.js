@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.createBackendServer = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
@@ -1978,6 +1979,12 @@ const createBackendServer = () => {
                 "/paymentStatus",
                 "/calculateClusterPoints",
                 "/sendEmail",
+                "/api/sendEmail",
+                "/api/paymentStatus",
+                "/api/calculateClusterPoints",
+                "/api/stkPush",
+                "/api/callback",
+                "/api/darajaCallback",
                 "/api/catalog",
                 "/api/sessions/:code",
                 "/api/admin/login",
@@ -2011,6 +2018,12 @@ const createBackendServer = () => {
     app.all("/paymentStatus", withAsyncGuard("paymentStatus", paymentStatusHandler));
     app.all("/calculateClusterPoints", withAsyncGuard("calculateClusterPoints", calculateClusterPointsHandler));
     app.all("/sendEmail", withAsyncGuard("sendEmail", sendEmailHandler));
+    app.all("/api/sendEmail", withAsyncGuard("sendEmailApi", sendEmailHandler));
+    app.all("/api/paymentStatus", withAsyncGuard("paymentStatusApi", paymentStatusHandler));
+    app.all("/api/calculateClusterPoints", withAsyncGuard("calculateClusterPointsApi", calculateClusterPointsHandler));
+    app.all("/api/stkPush", withAsyncGuard("stkPushApi", stkPushHandler));
+    app.all("/api/callback", withAsyncGuard("callbackApi", darajaCallbackHandler));
+    app.all("/api/darajaCallback", withAsyncGuard("darajaCallbackApi", darajaCallbackHandler));
     // Serve React build (Vite) when available.
     const frontendDistCandidates = [
         path_1.default.resolve(__dirname, "..", "frontend", "dist"),
@@ -2067,6 +2080,7 @@ const createBackendServer = () => {
     });
     return app;
 };
+exports.createBackendServer = createBackendServer;
 const startLocalServer = async ({ app, requestedPort, retries, host, }) => new Promise((resolve, reject) => {
     const tryListen = (port, remainingRetries) => {
         const server = app.listen(port, host, () => {
@@ -2090,7 +2104,7 @@ if (require.main === module) {
     const port = Number(getEnv("PORT", "5001")) || 5001;
     const host = getEnv("HOST", "0.0.0.0") || "0.0.0.0";
     const retries = Number(getEnv("PORT_RETRIES", "20")) || 20;
-    const app = createBackendServer();
+    const app = (0, exports.createBackendServer)();
     startLocalServer({ app, requestedPort: port, retries, host })
         .then(({ port: actualPort }) => {
         logger.info("Backend server started", {
