@@ -9,6 +9,9 @@
     "build": "node scripts/build.js",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "tsc -p tsconfig.json",
+    "build:frontend:prod": "npm --prefix frontend run build",
+    "build:backend:prod": "tsc -p tsconfig.json",
+    "build:prod": "npm run build:frontend:prod && npm run build:backend:prod",
     "start": "node --env-file=.env dist/index.js",
     "start:local": "npm run start"
   },
