@@ -54,7 +54,7 @@ const parseNumberEnv = (value, fallback) => {
 const sessionsPath = firstEnv("REALTIME_SESSIONS_PATH", "VITE_REALTIME_SESSIONS_PATH") || "clusterSessions";
 const courseCatalogPath = firstEnv("REALTIME_COURSES_PATH", "VITE_REALTIME_COURSES_PATH") || "courses";
 const adminsPath = firstEnv("REALTIME_ADMINS_PATH", "VITE_REALTIME_ADMINS_PATH") || "admins";
-const payableAmount = parseNumberEnv(getEnv("PAYABLE_AMOUNT"), 0);
+const payableAmount = parseNumberEnv(getEnv("PAYABLE_AMOUNT"), 150);
 const superAdminEmail = firstEnv("SUPER_ADMIN_EMAIL", "VITE_SUPER_ADMIN_EMAIL").toLowerCase();
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/+$/, "");
 const rawCorsOrigins = (firstEnv("CORS_ORIGIN", "LOCAL_CORS_ORIGIN", "FRONTEND_ORIGIN") || "*").trim() || "*";
@@ -96,6 +96,12 @@ const buildFirebaseRealtimeUrl = (dbPath = "") => {
     }
     return url.toString();
 };
+const buildFirebaseRealtimeUrlForLog = (dbPath = "") => {
+    const normalizedPath = normalizeRealtimePath(dbPath);
+    const base = getFirebaseDatabaseUrl();
+    const pathname = normalizedPath ? `${normalizedPath}.json` : ".json";
+    return `${base}/${pathname}`;
+};
 const firebaseRealtimeRequest = async ({ method, dbPath = "", body, }) => {
     let response;
     try {
@@ -110,7 +116,13 @@ const firebaseRealtimeRequest = async ({ method, dbPath = "", body, }) => {
     }
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-        const message = String(payload?.error || payload?.message || `Firebase Realtime Database error (${response.status}).`);
+        let message = String(payload?.error || payload?.message || `Firebase Realtime Database error (${response.status}).`);
+        if (response.status === 404 && /not found/i.test(message)) {
+            message = `Firebase Realtime Database returned 404. Check FIREBASE_DATABASE_URL, auth token, and paths. (${buildFirebaseRealtimeUrlForLog(dbPath)})`;
+        }
+        else if (response.status === 401 || response.status === 403) {
+            message = `Firebase Realtime Database access denied (${response.status}). Check FIREBASE_DATABASE_AUTH_TOKEN / rules. (${buildFirebaseRealtimeUrlForLog(dbPath)})`;
+        }
         const requestError = new Error(message);
         requestError.statusCode = response.status;
         throw requestError;
@@ -1958,11 +1970,19 @@ const createBackendServer = () => {
     });
     app.get("/admin/health", requireAdminSession, withAsyncGuard("adminHealthLegacy", adminHealthHandler));
     app.get("/api/admin/health", requireAdminSession, withAsyncGuard("adminHealth", adminHealthHandler));
+    const healthPayload = () => ({
+        status: "ok",
+        service: "kuccps-cluster-backend-server",
+        trackedPayments: paymentSessionsByCheckoutId.size,
+    });
     app.get("/health", (request, response) => {
         response.status(200).json({
-            status: "ok",
-            service: "kuccps-cluster-backend-server",
-            trackedPayments: paymentSessionsByCheckoutId.size,
+            ...healthPayload(),
+        });
+    });
+    app.get("/api/health", (request, response) => {
+        response.status(200).json({
+            ...healthPayload(),
         });
     });
     app.get("/api", (request, response) => {
@@ -2035,9 +2055,18 @@ const createBackendServer = () => {
     const distPath = frontendDistCandidates.find((candidatePath) => fs_1.default.existsSync(path_1.default.join(candidatePath, "index.html")));
     const indexHtmlPath = distPath ? path_1.default.join(distPath, "index.html") : "";
     if (distPath && indexHtmlPath) {
-        app.use(express_1.default.static(distPath));
-        // SPA fallback – must come AFTER API routes but BEFORE the 404 handler.
+        app.use(express_1.default.static(distPath, {
+            setHeaders: (response, filePath) => {
+                if (path_1.default.basename(filePath) === "index.html") {
+                    response.setHeader("Cache-Control", "no-store");
+                }
+            },
+        }));
+        // SPA fallback - must come AFTER API routes but BEFORE the 404 handler.
         app.get("*", (request, response, next) => {
+            if (path_1.default.extname(request.path)) {
+                return next();
+            }
             // Avoid intercepting API/utility routes that don't expect HTML.
             if (request.path.startsWith("/api/") ||
                 request.path.startsWith("/stkPush") ||
@@ -2100,11 +2129,14 @@ const startLocalServer = async ({ app, requestedPort, retries, host, }) => new P
     };
     tryListen(requestedPort, retries);
 });
+const app = (0, exports.createBackendServer)();
+// Vercel expects a default export that is a function or server.
+exports.default = app;
+module.exports = app;
 if (require.main === module) {
     const port = Number(getEnv("PORT", "5001")) || 5001;
     const host = getEnv("HOST", "0.0.0.0") || "0.0.0.0";
     const retries = Number(getEnv("PORT_RETRIES", "20")) || 20;
-    const app = (0, exports.createBackendServer)();
     startLocalServer({ app, requestedPort: port, retries, host })
         .then(({ port: actualPort }) => {
         logger.info("Backend server started", {

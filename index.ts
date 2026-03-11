@@ -2504,10 +2504,22 @@ export const createBackendServer = () => {
   );
   const indexHtmlPath = distPath ? path.join(distPath, "index.html") : "";
   if (distPath && indexHtmlPath) {
-    app.use(express.static(distPath));
+    app.use(
+      express.static(distPath, {
+        setHeaders: (response, filePath) => {
+          if (path.basename(filePath) === "index.html") {
+            response.setHeader("Cache-Control", "no-store");
+          }
+        },
+      }),
+    );
 
-    // SPA fallback – must come AFTER API routes but BEFORE the 404 handler.
+    // SPA fallback - must come AFTER API routes but BEFORE the 404 handler.
     app.get("*", (request, response, next) => {
+      if (path.extname(request.path)) {
+        return next();
+      }
+
       // Avoid intercepting API/utility routes that don't expect HTML.
       if (
         request.path.startsWith("/api/") ||
