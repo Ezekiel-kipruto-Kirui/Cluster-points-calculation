@@ -7,5 +7,9 @@
       "runtime": "nodejs20.x"
     }
   },
-  "routes": [{ "src": "/(.*)", "dest": "/api/index" }]
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }
