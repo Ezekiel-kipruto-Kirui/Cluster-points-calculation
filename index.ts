@@ -2375,6 +2375,12 @@ export const createBackendServer = () => {
     trackedPayments: paymentSessionsByCheckoutId.size,
   });
 
+  app.get("/", (request, response) => {
+    response.status(200).json({
+      ...healthPayload(),
+    });
+  });
+
   app.get("/health", (request, response) => {
     response.status(200).json({
       ...healthPayload(),
