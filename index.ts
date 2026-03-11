@@ -609,6 +609,7 @@ const upsertSingleCourseCatalogEntryInDb = async ({
 };
 
 const saveClusterSessionInDb = async ({
+  code,
   email,
   phoneNumber,
   amountPaid,
@@ -617,6 +618,7 @@ const saveClusterSessionInDb = async ({
   medicineEligible,
   paymentResponse,
 }: {
+  code?: string;
   email: string;
   phoneNumber: string;
   amountPaid: number;
@@ -625,23 +627,47 @@ const saveClusterSessionInDb = async ({
   medicineEligible: boolean;
   paymentResponse: any;
 }): Promise<ClusterSessionPayload> => {
-  const code = await createUniqueAccessCode();
+  const db = getRealtimeDb();
+  const normalizedEmail = String(email || "").trim();
+  const normalizedCode = normalizeSessionCode(code);
   const timestamp = new Date().toISOString();
+  let resolvedCode = normalizedCode;
+  let createdAt = timestamp;
+
+  if (normalizedCode) {
+    const snapshot = await db.ref(`${sessionsPath}/${normalizedCode}`).once("value");
+    if (snapshot.exists()) {
+      const existing: any = snapshot.val() || {};
+      const existingEmail = String(existing.email || "").trim().toLowerCase();
+      if (existingEmail && existingEmail === normalizedEmail.toLowerCase()) {
+        createdAt = String(existing.createdAt || timestamp);
+      } else {
+        const error: any = new Error("Access code already exists.");
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+  }
+
+  if (!resolvedCode) {
+    resolvedCode = await createUniqueAccessCode();
+  }
+
   const payload: ClusterSessionPayload = {
-    code,
-    email: String(email || "").trim(),
+    code: resolvedCode,
+    email: normalizedEmail,
     phoneNumber: String(phoneNumber || "").trim(),
     amountPaid: Number(amountPaid ?? 0),
     grades: normalizeSessionGrades(grades),
     results: normalizeSessionResults(results),
     medicineEligible: Boolean(medicineEligible),
     paymentResponse: paymentResponse || null,
-    createdAt: timestamp,
+    createdAt,
     updatedAt: timestamp,
     storage: "firebase",
   };
 
-  await getRealtimeDb().ref(`${sessionsPath}/${code}`).set(payload);
+  await db.ref(`${sessionsPath}/${resolvedCode}`).set(payload);
   return payload;
 };
 
@@ -1598,7 +1624,10 @@ const adminLoginHandler: express.RequestHandler = async (request, response) => {
   });
 
   if (!profile || profile.active === false) {
-    response.status(403).json({ error: "This account is not registered as an active admin." });
+    const hint = superAdminEmail
+      ? "Ask a super admin to add or re-activate this account."
+      : "Set SUPER_ADMIN_EMAIL in the backend env to bootstrap a super admin.";
+    response.status(403).json({ error: `This account is not registered as an active admin. ${hint}` });
     return;
   }
 
@@ -1734,6 +1763,7 @@ const saveClusterSessionHandler: express.RequestHandler = async (request, respon
   if (!assertMethod(request, response, "POST")) return;
   const body = getBody(request);
   const session = await saveClusterSessionInDb({
+    code: body?.code,
     email: String(body?.email || ""),
     phoneNumber: String(body?.phoneNumber || ""),
     amountPaid: Number(body?.amountPaid ?? 0),
@@ -2226,9 +2256,10 @@ const sendEmailHandler: express.RequestHandler = async (request, response) => {
 
   try {
     const body = getBody(request);
-    const to = sanitizeHeaderValue(body.email);
-    const subject = sanitizeHeaderValue(body.subject);
-    const message = String(body.message || "");
+    const query = request.query || {};
+    const to = sanitizeHeaderValue(body.email ?? query.email);
+    const subject = sanitizeHeaderValue(body.subject ?? query.subject);
+    const message = String(body.message ?? query.message ?? "");
 
     if (!to || !subject || !message) {
       response.status(400).json({ error: "email, subject, and message are required." });
@@ -2360,6 +2391,7 @@ const createBackendServer = () => {
         "/paymentStatus",
         "/calculateClusterPoints",
         "/sendEmail",
+        "/api/sendEmail",
         "/api/catalog",
         "/api/sessions/:code",
         "/api/admin/login",
@@ -2418,6 +2450,7 @@ const createBackendServer = () => {
   app.all("/paymentStatus", withAsyncGuard("paymentStatus", paymentStatusHandler));
   app.all("/calculateClusterPoints", withAsyncGuard("calculateClusterPoints", calculateClusterPointsHandler));
   app.all("/sendEmail", withAsyncGuard("sendEmail", sendEmailHandler));
+  app.all("/api/sendEmail", withAsyncGuard("sendEmailApi", sendEmailHandler));
 
   // Serve React build (Vite) when available.
   const frontendDistCandidates = [

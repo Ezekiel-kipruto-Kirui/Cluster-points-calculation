@@ -4,7 +4,7 @@ import { computeAllClusters, medicineEligibility } from "./clusterEngine";
 const endpoints = {
   darajaPayment: buildApiUrl("/api/payments"),
   darajaQuery: buildApiUrl("/api/payments/query"),
-  email: buildApiUrl("/sendEmail"),
+  email: buildApiUrl("/api/sendEmail"),
   calculateCluster: buildApiUrl("/calculateClusterPoints"),
   adminHealth: buildApiUrl("/api/admin/health"),
 };

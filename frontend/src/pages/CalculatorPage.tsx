@@ -11,7 +11,7 @@ import {
   waitForSuccessfulPayment,
 } from "../lib/api";
 import { saveClusterSessionWithFallback } from "../lib/realtimeDb";
-import { buildAccessCodeEmailMessage, buildEmailReceiptMessage } from "../utils/messages";
+import { buildAccessCodeEmailMessage } from "../utils/messages";
 import { normalizePhone, isValidEmail } from "../utils/validators";
 
 type SubjectCode = keyof typeof SUBJECTS;
@@ -49,7 +49,6 @@ export default function CalculatorPage({ onCalculationReady, payableAmount, grad
   const [pendingPayload, setPendingPayload] = useState<Record<string, string> | null>(null);
   const [pendingEmail, setPendingEmail] = useState("");
   const [email, setEmail] = useState("");
-  const [receiptEmail, setReceiptEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -97,28 +96,6 @@ export default function CalculatorPage({ onCalculationReady, payableAmount, grad
 
     setPendingPayload(payload);
     setPendingEmail(normalizedEmail);
-
-    try {
-      setIsLoading(true);
-      if (normalizedEmail && normalizedEmail !== receiptEmail) {
-        await sendServiceEmail({
-          email: normalizedEmail,
-          subject: "KUCCPS Cluster Calculator: Email received",
-          message: buildEmailReceiptMessage({ payableAmount }),
-        });
-        setReceiptEmail(normalizedEmail);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      setFormError(
-        message
-          ? `Unable to send confirmation email (${message}). Please verify your email and try again.`
-          : "Unable to send confirmation email. Please verify your email and try again.",
-      );
-      return;
-    } finally {
-      setIsLoading(false);
-    }
 
     setPhoneDialogOpen(true);
   };
