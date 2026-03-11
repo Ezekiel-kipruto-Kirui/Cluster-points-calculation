@@ -1,15 +1,15 @@
-import { buildApiUrl } from "./apiBase";
+import { fetchApi } from "./apiBase";
 
 const localSessionsStorageKey = "kuccps.cluster.sessions";
 
 const apiRoutes = {
-  catalog: buildApiUrl("/api/catalog"),
-  adminCatalogUpload: buildApiUrl("/api/admin/catalog/upload"),
-  adminCatalogCourse: buildApiUrl("/api/admin/catalog/course"),
-  sessions: buildApiUrl("/api/sessions"),
-  adminSessions: buildApiUrl("/api/admin/sessions"),
-  adminSessionsBulkDelete: buildApiUrl("/api/admin/sessions/delete-many"),
-  adminMe: buildApiUrl("/api/admin/me"),
+  catalog: "/api/catalog",
+  adminCatalogUpload: "/api/admin/catalog/upload",
+  adminCatalogCourse: "/api/admin/catalog/course",
+  sessions: "/api/sessions",
+  adminSessions: "/api/admin/sessions",
+  adminSessionsBulkDelete: "/api/admin/sessions/delete-many",
+  adminMe: "/api/admin/me",
 };
 
 type HttpResult<T = any> = {
@@ -28,8 +28,8 @@ const parseResponseBody = async (response: Response): Promise<any | null> => {
   }
 };
 
-const getRequest = async (url: string): Promise<HttpResult> => {
-  const response = await fetch(url, {
+const getRequest = async (path: string): Promise<HttpResult> => {
+  const response = await fetchApi(path, {
     method: "GET",
     credentials: "include",
   });
@@ -37,8 +37,8 @@ const getRequest = async (url: string): Promise<HttpResult> => {
   return { ok: response.ok, status: response.status, data };
 };
 
-const postRequest = async (url: string, payload: any): Promise<HttpResult> => {
-  const response = await fetch(url, {
+const postRequest = async (path: string, payload: any): Promise<HttpResult> => {
+  const response = await fetchApi(path, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -48,8 +48,8 @@ const postRequest = async (url: string, payload: any): Promise<HttpResult> => {
   return { ok: response.ok, status: response.status, data };
 };
 
-const patchRequest = async (url: string, payload: any): Promise<HttpResult> => {
-  const response = await fetch(url, {
+const patchRequest = async (path: string, payload: any): Promise<HttpResult> => {
+  const response = await fetchApi(path, {
     method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -59,8 +59,8 @@ const patchRequest = async (url: string, payload: any): Promise<HttpResult> => {
   return { ok: response.ok, status: response.status, data };
 };
 
-const deleteRequest = async (url: string): Promise<HttpResult> => {
-  const response = await fetch(url, {
+const deleteRequest = async (path: string): Promise<HttpResult> => {
+  const response = await fetchApi(path, {
     method: "DELETE",
     credentials: "include",
   });

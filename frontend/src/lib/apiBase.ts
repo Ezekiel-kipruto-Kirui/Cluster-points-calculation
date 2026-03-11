@@ -48,3 +48,19 @@ export const buildApiUrl = (path: string) => {
 };
 
 export const getApiBaseUrl = () => normalizedApiBase;
+
+const toRelativePath = (value: string) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed || isAbsoluteUrl(trimmed)) return "";
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+};
+
+export const fetchApi = async (path: string, init?: RequestInit) => {
+  const primaryUrl = buildApiUrl(path);
+  const response = await fetch(primaryUrl, init);
+  if (response.status !== 404) return response;
+
+  const fallbackPath = toRelativePath(path);
+  if (!fallbackPath || fallbackPath === primaryUrl) return response;
+  return fetch(fallbackPath, init);
+};
