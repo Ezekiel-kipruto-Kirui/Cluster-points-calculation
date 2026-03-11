@@ -54,7 +54,7 @@ const parseNumberEnv = (value: string, fallback: number) => {
 const sessionsPath = firstEnv("REALTIME_SESSIONS_PATH", "VITE_REALTIME_SESSIONS_PATH") || "clusterSessions";
 const courseCatalogPath = firstEnv("REALTIME_COURSES_PATH", "VITE_REALTIME_COURSES_PATH") || "courses";
 const adminsPath = firstEnv("REALTIME_ADMINS_PATH", "VITE_REALTIME_ADMINS_PATH") || "admins";
-const payableAmount = parseNumberEnv(getEnv("PAYABLE_AMOUNT"), 0);
+const payableAmount = parseNumberEnv(getEnv("PAYABLE_AMOUNT"), 150);
 const superAdminEmail = firstEnv("SUPER_ADMIN_EMAIL", "VITE_SUPER_ADMIN_EMAIL").toLowerCase();
 const normalizeOrigin = (value: string) => String(value || "").trim().replace(/\/+$/, "");
 const rawCorsOrigins = (firstEnv("CORS_ORIGIN", "LOCAL_CORS_ORIGIN", "FRONTEND_ORIGIN") || "*").trim() || "*";
@@ -153,6 +153,13 @@ const buildFirebaseRealtimeUrl = (dbPath = ""): string => {
   return url.toString();
 };
 
+const buildFirebaseRealtimeUrlForLog = (dbPath = ""): string => {
+  const normalizedPath = normalizeRealtimePath(dbPath);
+  const base = getFirebaseDatabaseUrl();
+  const pathname = normalizedPath ? `${normalizedPath}.json` : ".json";
+  return `${base}/${pathname}`;
+};
+
 const firebaseRealtimeRequest = async ({
   method,
   dbPath = "",
@@ -175,7 +182,18 @@ const firebaseRealtimeRequest = async ({
 
   const payload: any = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = String(payload?.error || payload?.message || `Firebase Realtime Database error (${response.status}).`);
+    let message = String(
+      payload?.error || payload?.message || `Firebase Realtime Database error (${response.status}).`,
+    );
+    if (response.status === 404 && /not found/i.test(message)) {
+      message = `Firebase Realtime Database returned 404. Check FIREBASE_DATABASE_URL, auth token, and paths. (${buildFirebaseRealtimeUrlForLog(
+        dbPath,
+      )})`;
+    } else if (response.status === 401 || response.status === 403) {
+      message = `Firebase Realtime Database access denied (${response.status}). Check FIREBASE_DATABASE_AUTH_TOKEN / rules. (${buildFirebaseRealtimeUrlForLog(
+        dbPath,
+      )})`;
+    }
     const requestError: any = new Error(message);
     requestError.statusCode = response.status;
     throw requestError;

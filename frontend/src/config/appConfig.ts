@@ -9,5 +9,5 @@ const rawPayableAmount = String(
   import.meta.env.PAYABLE_AMOUNT || import.meta.env.VITE_PAYABLE_AMOUNT || "",
 ).trim();
 
-export const PAYABLE_AMOUNT = parseNumberEnv(rawPayableAmount, 0);
+export const PAYABLE_AMOUNT = parseNumberEnv(rawPayableAmount, 150);
 export const SUPER_ADMIN_EMAIL = "";
