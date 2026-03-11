@@ -6,13 +6,14 @@
     "node": "20"
   },
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "npm run build:backend",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "tsc -p tsconfig.json",
+    "build:full": "node scripts/build.js",
     "build:frontend:prod": "npm run build:frontend",
     "build:backend:prod": "npm run build:backend",
-    "build:prod": "node scripts/build.js",
-    "build:railway": "node scripts/build.js",
+    "build:prod": "npm run build:backend",
+    "build:railway": "npm run build:backend",
     "start": "node dist/index.js",
     "start:local": "node --env-file=.env dist/index.js"
   },
