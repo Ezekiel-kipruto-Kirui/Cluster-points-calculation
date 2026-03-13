@@ -48,7 +48,7 @@ export const medicineEligibility = (gradesByCode: GradeMap): boolean => {
   return (
     hasValidGrade("BIO") &&
     hasValidGrade("CHE") &&
-    (hasValidGrade("MAT") || hasValidGrade("PHY")) &&
+    hasValidGrade("MAT") &&
     (hasValidGrade("ENG") || hasValidGrade("KIS"))
   );
 };

@@ -60,19 +60,27 @@ const parseRequirements = (value: unknown): CourseRequirement[] => {
   return requirements;
 };
 
-const normalizeClinicalMedicineSubject = (courseName: string, subject: string) => {
+const normalizeMedicalSubject = (courseName: string, cluster: number, subject: string) => {
   if (!subject) return subject;
-  if (String(courseName || "").trim().toUpperCase() !== "BACHELOR OF SCIENCE CLINICAL MEDICINE") return subject;
   const normalized = subject.replace(/\s+/g, " ").trim();
+  if (cluster === 13) {
+    if (/^mathematics\s*\/\s*physics$/i.test(normalized)) return "Mathematics";
+    if (/^physics$/i.test(normalized)) return "";
+  }
+  if (String(courseName || "").trim().toUpperCase() !== "BACHELOR OF SCIENCE CLINICAL MEDICINE") return subject;
   if (/^mathematics\s*\/\s*physics$/i.test(normalized)) return "Mathematics";
   return subject;
 };
 
-const normalizeCourseRequirements = (courseName: string, requirements: CourseRequirement[] = []) => {
+const normalizeCourseRequirements = (
+  courseName: string,
+  cluster: number,
+  requirements: CourseRequirement[] = [],
+) => {
   const normalized: CourseRequirement[] = [];
   requirements.forEach((entry) => {
     if (!entry?.subject || !entry?.grade) return;
-    const subject = normalizeClinicalMedicineSubject(courseName, entry.subject);
+    const subject = normalizeMedicalSubject(courseName, cluster, entry.subject);
     if (!subject) return;
     const grade = String(entry.grade || "").trim().toUpperCase();
     if (!grade) return;
@@ -134,7 +142,11 @@ export const parseCourseCsvToCatalog = (csvText: string): Catalog => {
     if (!catalog[currentCourse.cluster]) catalog[currentCourse.cluster] = [];
     catalog[currentCourse.cluster].push({
       name: currentCourse.name,
-      requirements: normalizeCourseRequirements(currentCourse.name, currentCourse.requirements),
+      requirements: normalizeCourseRequirements(
+        currentCourse.name,
+        currentCourse.cluster,
+        currentCourse.requirements,
+      ),
       universities: dedupeUniversities(currentCourse.universities),
     });
     currentCourse = null;

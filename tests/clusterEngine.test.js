@@ -36,6 +36,18 @@ test("medicineEligibility returns false when a requirement is missing", () => {
   );
 });
 
+test("medicineEligibility requires mathematics (physics alone is not enough)", () => {
+  assert.equal(
+    medicineEligibility({
+      BIO: "B",
+      CHE: "B",
+      PHY: "B",
+      ENG: "C+",
+    }),
+    false,
+  );
+});
+
 test("computeCluster returns 0 with insufficient grades", () => {
   assert.equal(
     computeCluster(1, {

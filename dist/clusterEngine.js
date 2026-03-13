@@ -38,7 +38,7 @@ const medicineEligibility = (gradesByCode) => {
     const hasValidGrade = (code) => Boolean(gradesByCode[code] && gradesByCode[code] in GRADE_POINTS);
     return (hasValidGrade("BIO") &&
         hasValidGrade("CHE") &&
-        (hasValidGrade("MAT") || hasValidGrade("PHY")) &&
+        hasValidGrade("MAT") &&
         (hasValidGrade("ENG") || hasValidGrade("KIS")));
 };
 exports.medicineEligibility = medicineEligibility;

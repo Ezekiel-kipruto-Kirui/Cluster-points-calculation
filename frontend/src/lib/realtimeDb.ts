@@ -101,18 +101,26 @@ const normalizeSessionGrades = (value: any): Record<string, string> => {
   return normalized;
 };
 
-const normalizeClinicalMedicineSubject = (courseName: string, subject: string) => {
+const normalizeMedicalSubject = (courseName: string, cluster: number, subject: string) => {
   if (!subject) return subject;
-  if (String(courseName || "").trim().toUpperCase() !== "BACHELOR OF SCIENCE CLINICAL MEDICINE") return subject;
   const normalized = subject.replace(/\s+/g, " ").trim();
+  if (cluster === 13) {
+    if (/^mathematics\s*\/\s*physics$/i.test(normalized)) return "Mathematics";
+    if (/^physics$/i.test(normalized)) return "";
+  }
+  if (String(courseName || "").trim().toUpperCase() !== "BACHELOR OF SCIENCE CLINICAL MEDICINE") return subject;
   if (/^mathematics\s*\/\s*physics$/i.test(normalized)) return "Mathematics";
   return subject;
 };
 
-const normalizeCourseRequirements = (courseName: string, requirements: Record<string, string>) => {
+const normalizeCourseRequirements = (
+  courseName: string,
+  cluster: number,
+  requirements: Record<string, string>,
+) => {
   const normalized: Record<string, string> = {};
   Object.entries(requirements || {}).forEach(([subject, grade]) => {
-    const subjectName = normalizeClinicalMedicineSubject(courseName, String(subject || "").trim());
+    const subjectName = normalizeMedicalSubject(courseName, cluster, String(subject || "").trim());
     const normalizedGrade = String(grade || "").trim().toUpperCase();
     if (!subjectName || !normalizedGrade) return;
     normalized[subjectName] = normalizedGrade;
@@ -168,10 +176,11 @@ const saveLocalSession = (sessionPayload: ClusterSessionPayload): void => {
   setLocalSessionsMap(sessionsMap);
 };
 
-const normalizeCourse = (rawCourse: any, fallbackName = ""): NormalizedCourse => ({
+const normalizeCourse = (rawCourse: any, cluster: number, fallbackName = ""): NormalizedCourse => ({
   name: rawCourse?.name || fallbackName,
   requirements: normalizeCourseRequirements(
     rawCourse?.name || fallbackName,
+    cluster,
     (rawCourse?.requirements || {}) as Record<string, string>,
   ),
   universities: Array.isArray(rawCourse?.universities)
@@ -183,9 +192,9 @@ const normalizeCourse = (rawCourse: any, fallbackName = ""): NormalizedCourse =>
     : [],
 });
 
-const normalizeClusterValue = (clusterValue: any): NormalizedCourse[] => {
+const normalizeClusterValue = (clusterValue: any, cluster: number): NormalizedCourse[] => {
   const items = Array.isArray(clusterValue) ? clusterValue : Object.values(clusterValue || {});
-  return items.map((entry) => normalizeCourse(entry)).filter((course) => Boolean(course.name));
+  return items.map((entry) => normalizeCourse(entry, cluster)).filter((course) => Boolean(course.name));
 };
 
 export type NormalizedCourse = {
@@ -203,7 +212,7 @@ const normalizeCourseCatalog = (raw: any): NormalizedCatalog => {
   Object.entries(raw).forEach(([clusterKey, clusterValue]) => {
     const clusterNumber = Number(clusterKey);
     if (!Number.isInteger(clusterNumber) || clusterNumber < 1) return;
-    normalized[clusterNumber] = normalizeClusterValue(clusterValue);
+    normalized[clusterNumber] = normalizeClusterValue(clusterValue, clusterNumber);
   });
 
   return normalized;

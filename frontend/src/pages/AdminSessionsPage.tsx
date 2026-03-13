@@ -21,7 +21,7 @@ import {
 } from "../lib/realtimeDb";
 
 const PAGE_SIZE = 20;
-const coreSubjects = ["BIO", "CHE", "MAT", "PHY"];
+const coreSubjects = ["BIO", "CHE", "MAT"];
 
 const emptyEditForm = {
   code: "",
@@ -468,9 +468,7 @@ export default function AdminSessionsPage({ firebaseConfigured }) {
                           <div className="grid gap-4 lg:grid-cols-3">
                             <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <h3 className="text-sm font-semibold text-slate-900">Qualification Details</h3>
-                              <p className="mt-2 text-xs text-slate-600">
-                                Medicine core subjects (BIO, CHE, MAT, PHY):
-                              </p>
+                              <p className="mt-2 text-xs text-slate-600">Medicine core subjects (BIO, CHE, MAT):</p>
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 {coreSubjects.map((subject) => (
                                   <span
