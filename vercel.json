@@ -2,8 +2,19 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "buildCommand": "npm run build:full",
+  "outputDirectory": "dist/frontend/dist",
   "rewrites": [
     { "source": "/api", "destination": "/api/index" },
-    { "source": "/api/:path*", "destination": "/api/index?path=:path*" }
+    { "source": "/api/:path*", "destination": "/api/index?path=:path*" },
+    { "source": "/stkPush", "destination": "/api/index?path=/stkPush" },
+    { "source": "/callback", "destination": "/api/index?path=/callback" },
+    { "source": "/darajaCallback", "destination": "/api/index?path=/darajaCallback" },
+    { "source": "/paymentStatus", "destination": "/api/index?path=/paymentStatus" },
+    { "source": "/calculateClusterPoints", "destination": "/api/index?path=/calculateClusterPoints" },
+    { "source": "/sendEmail", "destination": "/api/index?path=/sendEmail" },
+    { "source": "/config/firebase", "destination": "/api/index?path=/config/firebase" },
+    { "source": "/health", "destination": "/api/index?path=/health" },
+    { "source": "/admin/health", "destination": "/api/index?path=/admin/health" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

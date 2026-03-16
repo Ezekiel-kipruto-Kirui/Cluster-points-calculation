@@ -9,7 +9,11 @@ const ensureApiPath = (req: any) => {
   url.searchParams.delete("path");
   const trimmed = String(rawPath || "").trim();
   const normalized = trimmed ? (trimmed.startsWith("/") ? trimmed : `/${trimmed}`) : "";
-  const targetPath = normalized.startsWith("/api") ? normalized : `/api${normalized}`;
+  const targetPath = trimmed.startsWith("/")
+    ? normalized
+    : normalized.startsWith("/api")
+      ? normalized
+      : `/api${normalized}`;
   const query = url.searchParams.toString();
   req.url = query ? `${targetPath}?${query}` : targetPath;
 };
